@@ -1,4 +1,4 @@
-name: Build Windows (Test)
+name: Build Windows
 
 on:
   workflow_dispatch:
@@ -34,8 +34,6 @@ jobs:
           echo "=== Built artifacts ==="
           ls -lh packages/electron/dist/*.exe 2>/dev/null || echo "No .exe found"
           ls -lh packages/electron/dist/*.blockmap 2>/dev/null || true
-          echo "=== Full dist directory ==="
-          ls -lh packages/electron/dist/ 2>/dev/null || echo "dist dir not found"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -44,4 +42,4 @@ jobs:
           path: |
             packages/electron/dist/*.exe
             packages/electron/dist/*.blockmap
-          retention-days: 3
+          retention-days: 7
