@@ -19,12 +19,18 @@ console.log(`[electron] rebuilding native modules against Electron ${electronVer
 // Rebuild against the hoisted root node_modules (bun workspace layout).
 // force=true re-links regardless of cached state; prebuild-install lookup is
 // bypassed by @electron/rebuild in favor of direct node-gyp builds.
+// bun-pty only works in Bun runtime; skip it on Windows where it has no
+// prebuilt binaries and node-pty is the only PTY backend anyway.
+const nativeModules = process.platform === 'win32'
+  ? ['better-sqlite3', 'node-pty']
+  : ['better-sqlite3', 'node-pty', 'bun-pty'];
+
 await rebuild({
   buildPath: repoRoot,
   electronVersion,
   force: true,
   arch: process.env.ELECTRON_BUILDER_ARCH || process.arch,
-  onlyModules: ['better-sqlite3', 'node-pty', 'bun-pty'],
+  onlyModules: nativeModules,
 });
 
 console.log('[electron] native modules rebuilt successfully');
