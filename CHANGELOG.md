@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.12.0-beta.1] - 2026-05-14
+
+- Windows: added Windows Electron build support (NSIS installer + portable exe)
+
 ## [1.11.0] - 2026-05-14
 
 - Updates/OpenCode: added in-app OpenCode update checks and upgrade actions, making it easier to keep the bundled OpenCode runtime current without leaving OpenChamber.
