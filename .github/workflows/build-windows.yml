@@ -1,7 +1,6 @@
 name: Build Windows
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch:
 
 jobs:
   build-windows:
@@ -16,6 +15,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Get bun version
+        id: bun-version
+        shell: bash
+        run: echo "version=$(bun --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache bun global
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ steps.bun-version.outputs.version }}-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            bun-${{ steps.bun-version.outputs.version }}-${{ runner.os }}-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      - name: Cache electron binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('packages/electron/package.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
