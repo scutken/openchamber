@@ -1860,8 +1860,10 @@ export const Header: React.FC<HeaderProps> = ({
     if (!isDesktopApp || !isWinPlatform) {
       return undefined;
     }
-    // Windows titleBarOverlay: 3 buttons (min/max/close) at ~46px each ≈ 138px
-    return { paddingRight: 138 };
+    // Windows titleBarOverlay: 3 buttons (min/max/close) at ~46px each ≈ 138px.
+    // Also set an explicit background matching the overlay color so the native
+    // buttons blend seamlessly with the header.
+    return { paddingRight: 138, backgroundColor: '#151313' };
   }, [isDesktopApp, isWinPlatform]);
 
   const mergedDesktopHeaderStyle = React.useMemo<React.CSSProperties | undefined>(() => {
