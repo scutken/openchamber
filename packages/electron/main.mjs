@@ -1168,7 +1168,12 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
     // Tauri used an overlay title bar with explicit traffic-light placement.
     // Electron's hiddenInset adds its own extra inset, which leaves the controls
     // visibly lower than the app header. Use a plain hidden title bar instead.
-    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: process.platform === 'win32' ? {
+      color: '#151313',
+      symbolColor: '#999999',
+      height: 36
+    } : undefined,
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     webPreferences: {
       additionalArguments: [
@@ -1420,7 +1425,12 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     minHeight: MINI_CHAT_MIN_WINDOW_HEIGHT,
     show: false,
     backgroundColor: '#151313',
-    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: process.platform === 'win32' ? {
+      color: '#151313',
+      symbolColor: '#999999',
+      height: 36
+    } : undefined,
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     webPreferences: {
       additionalArguments: [
@@ -1782,51 +1792,81 @@ const CLI_BY_APP_ID = {
   vscodium: 'codium',
   windsurf: 'windsurf',
   zed: 'zed',
+  qoder: 'qoder',
+};
+
+const isCommandAvailable = async (cmd) => {
+  const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+  try {
+    const { status } = await execFileAsync(whichCmd, [cmd], { stdio: 'ignore' });
+    return status === 0;
+  } catch {
+    return false;
+  }
 };
 
 const buildOpenProjectSpecs = ({ projectPath, appId, appName }) => {
-  if (appId === 'finder') {
-    return [{ program: 'open', args: [projectPath] }];
+  if (process.platform === 'darwin') {
+    if (appId === 'finder') {
+      return [{ program: 'open', args: [projectPath] }];
+    }
+    if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
+      return [{ program: 'open', args: ['-a', appName, projectPath] }];
+    }
+    const specs = [];
+    const cli = CLI_BY_APP_ID[appId];
+    if (cli) {
+      specs.push({ program: cli, args: ['-n', projectPath] });
+    }
+    if (JETBRAINS_APP_IDS.has(appId)) {
+      specs.push({ program: 'open', args: ['-na', appName, '--args', projectPath] });
+    }
+    specs.push({ program: 'open', args: ['-a', appName, projectPath] });
+    return specs;
   }
 
-  if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
-    return [{ program: 'open', args: ['-a', appName, projectPath] }];
-  }
-
-  const specs = [];
-
+  // Windows / Linux
   const cli = CLI_BY_APP_ID[appId];
   if (cli) {
-    specs.push({ program: cli, args: ['-n', projectPath] });
+    return [{ program: cli, args: [projectPath] }];
   }
-
-  if (JETBRAINS_APP_IDS.has(appId)) {
-    specs.push({ program: 'open', args: ['-na', appName, '--args', projectPath] });
+  // Terminal emulators: open containing directory
+  if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
+    return [{ program: 'xdg-open', args: [projectPath] }];
   }
-
-  specs.push({ program: 'open', args: ['-a', appName, projectPath] });
-  return specs;
+  // Fallback: use shell.openPath via a spawned process
+  return [{ program: process.platform === 'win32' ? 'cmd' : 'xdg-open', args: process.platform === 'win32' ? ['/c', 'start', projectPath] : [projectPath] }];
 };
 
 const buildOpenFileSpecs = ({ filePath, appId, appName }) => {
-  if (appId === 'finder') {
-    return [{ program: 'open', args: ['-R', filePath] }];
+  if (process.platform === 'darwin') {
+    if (appId === 'finder') {
+      return [{ program: 'open', args: ['-R', filePath] }];
+    }
+    const parentDir = path.dirname(filePath);
+    if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
+      return [{ program: 'open', args: ['-a', appName, parentDir] }];
+    }
+    const specs = [];
+    const cli = CLI_BY_APP_ID[appId];
+    if (cli) {
+      specs.push({ program: cli, args: [filePath] });
+    }
+    specs.push({ program: 'open', args: ['-a', appName, filePath] });
+    return specs;
   }
 
-  const parentDir = path.dirname(filePath);
-  if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
-    return [{ program: 'open', args: ['-a', appName, parentDir] }];
-  }
-
-  const specs = [];
-
+  // Windows / Linux
   const cli = CLI_BY_APP_ID[appId];
   if (cli) {
-    specs.push({ program: cli, args: [filePath] });
+    return [{ program: cli, args: [filePath] }];
   }
-
-  specs.push({ program: 'open', args: ['-a', appName, filePath] });
-  return specs;
+  // Terminal emulators: open containing directory
+  if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
+    return [{ program: process.platform === 'win32' ? 'cmd' : 'xdg-open', args: process.platform === 'win32' ? ['/c', 'start', path.dirname(filePath)] : [path.dirname(filePath)] }];
+  }
+  // Fallback: open the file with the default handler
+  return [{ program: process.platform === 'win32' ? 'cmd' : 'xdg-open', args: process.platform === 'win32' ? ['/c', 'start', filePath] : [filePath] }];
 };
 
 const runSpecChain = (specs, appName) => {
@@ -2037,9 +2077,6 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     }
 
     case 'desktop_open_in_app': {
-      if (process.platform !== 'darwin') {
-        throw new Error('desktop_open_in_app is only supported on macOS');
-      }
       const projectPath = typeof args.projectPath === 'string' ? args.projectPath.trim() : '';
       const appId = typeof args.appId === 'string' ? args.appId.trim().toLowerCase() : '';
       const appName = typeof args.appName === 'string' ? args.appName.trim() : '';
@@ -2051,9 +2088,6 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     }
 
     case 'desktop_open_file_in_app': {
-      if (process.platform !== 'darwin') {
-        throw new Error('desktop_open_file_in_app is only supported on macOS');
-      }
       const filePath = typeof args.filePath === 'string' ? args.filePath.trim() : '';
       const appId = typeof args.appId === 'string' ? args.appId.trim().toLowerCase() : '';
       const appName = typeof args.appName === 'string' ? args.appName.trim() : '';
@@ -2065,12 +2099,29 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     }
 
     case 'desktop_filter_installed_apps': {
-      if (process.platform !== 'darwin') {
-        throw new Error('desktop_filter_installed_apps is only supported on macOS');
-      }
       if (!Array.isArray(args.apps)) return [];
+      if (process.platform === 'darwin') {
+        const results = await Promise.all(
+          args.apps.map(async (appName) => (await isAppBundleInstalled(String(appName))) ? String(appName) : null)
+        );
+        return results.filter(Boolean);
+      }
+      // Windows / Linux: detect apps by their CLI commands
+      const cliByAppName = {
+        'VS Code': 'code',
+        'Visual Studio Code': 'code',
+        'Cursor': 'cursor',
+        'VSCodium': 'codium',
+        'Windsurf': 'windsurf',
+        'Zed': 'zed',
+        'Qoder': 'qoder',
+      };
       const results = await Promise.all(
-        args.apps.map(async (appName) => (await isAppBundleInstalled(String(appName))) ? String(appName) : null)
+        args.apps.map(async (appName) => {
+          const cli = cliByAppName[String(appName)];
+          if (cli && (await isCommandAvailable(cli))) return String(appName);
+          return null;
+        })
       );
       return results.filter(Boolean);
     }
@@ -2091,9 +2142,6 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     }
 
     case 'desktop_get_installed_apps': {
-      if (process.platform !== 'darwin') {
-        throw new Error('desktop_get_installed_apps is only supported on macOS');
-      }
       const cachePath = buildInstalledAppsCachePath();
       const now = Math.floor(Date.now() / 1000);
       let cache = null;
@@ -2104,8 +2152,29 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       const cachedApps = Array.isArray(cache?.apps) ? cache.apps : [];
       const hasCache = Boolean(cache);
       const isCacheStale = !cache || (now - Number(cache.updatedAt || 0)) > INSTALLED_APPS_CACHE_TTL_SECS;
+      const buildInstalledAppsNonDarwin = async (apps) => {
+        const cliByAppName = {
+          'VS Code': 'code',
+          'Visual Studio Code': 'code',
+          'Cursor': 'cursor',
+          'VSCodium': 'codium',
+          'Windsurf': 'windsurf',
+          'Zed': 'zed',
+          'Qoder': 'qoder',
+        };
+        const results = [];
+        for (const name of apps) {
+          const cli = cliByAppName[String(name)];
+          if (cli && (await isCommandAvailable(cli))) {
+            results.push({ name: String(name), iconDataUrl: null });
+          }
+        }
+        return results;
+      };
       const refresh = async () => {
-        const apps = await buildInstalledApps(Array.isArray(args.apps) ? args.apps : []);
+        const apps = process.platform === 'darwin'
+          ? await buildInstalledApps(Array.isArray(args.apps) ? args.apps : [])
+          : await buildInstalledAppsNonDarwin(Array.isArray(args.apps) ? args.apps : []);
         await fsp.mkdir(path.dirname(cachePath), { recursive: true });
         await fsp.writeFile(cachePath, JSON.stringify({ updatedAt: now, apps }, null, 2));
         emitToAllWindows('openchamber:installed-apps-updated', apps);
