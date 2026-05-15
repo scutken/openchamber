@@ -1169,11 +1169,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
     // Electron's hiddenInset adds its own extra inset, which leaves the controls
     // visibly lower than the app header. Use a plain hidden title bar instead.
     titleBarStyle: 'hidden',
-    titleBarOverlay: process.platform === 'win32' ? {
-      color: '#151313',
-      symbolColor: '#999999',
-      height: 36
-    } : undefined,
+    titleBarOverlay: process.platform === 'win32' ? { height: 36 } : undefined,
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     webPreferences: {
       additionalArguments: [
@@ -1427,11 +1423,7 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     show: false,
     backgroundColor: '#151313',
     titleBarStyle: 'hidden',
-    titleBarOverlay: process.platform === 'win32' ? {
-      color: '#151313',
-      symbolColor: '#999999',
-      height: 36
-    } : undefined,
+    titleBarOverlay: process.platform === 'win32' ? { height: 36 } : undefined,
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     webPreferences: {
       additionalArguments: [

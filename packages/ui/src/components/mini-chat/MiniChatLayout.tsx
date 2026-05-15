@@ -205,8 +205,7 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
   const dragRegionStyle = React.useMemo(() => {
     const base: React.CSSProperties = { WebkitAppRegion: 'drag' };
     if (isWinPlatform) {
-      // Match the titleBarOverlay height (36px) and background color
-      return { ...base, paddingRight: 138, backgroundColor: '#151313' };
+      return { ...base, paddingRight: 138 };
     }
     return base;
   }, [isWinPlatform]);
