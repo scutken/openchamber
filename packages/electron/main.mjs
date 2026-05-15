@@ -1825,8 +1825,9 @@ const WIN_APP_PATHS = {
 const isCommandAvailable = async (cmd) => {
   const whichCmd = process.platform === 'win32' ? 'where' : 'which';
   try {
-    const { status } = await execFileAsync(whichCmd, [cmd], { stdio: 'ignore' });
-    if (status === 0) return true;
+    await execFileAsync(whichCmd, [cmd], { stdio: 'ignore' });
+    // execFileAsync resolves (no throw) only when exit code is 0
+    return true;
   } catch {
     // fall through to path probes
   }
