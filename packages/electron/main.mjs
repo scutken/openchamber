@@ -1797,24 +1797,17 @@ const CLI_BY_APP_ID = {
   qoder: 'qoder',
 };
 
-// Common Windows install paths for apps whose CLI may not be on PATH.
-// Keys are CLI command names, values are arrays of candidate paths to probe.
+// Resolve a template path containing %VAR% references against process.env.
+const resolveEnvPath = (template) =>
+  template.replace(/%([^%]+)%/g, (_, name) => process.env[name] || '');
+
+// Well-known per-app install paths (non-PATH) — checked after PATH scan.
 const WIN_APP_PATHS = {
-  code: [
-    '%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\bin\\code.cmd',
-  ],
-  cursor: [
-    '%LOCALAPPDATA%\\Programs\\cursor\\cursor.cmd',
-  ],
-  codium: [
-    '%LOCALAPPDATA%\\Programs\\VSCodium\\bin\\codium.cmd',
-  ],
-  windsurf: [
-    '%LOCALAPPDATA%\\Programs\\Windsurf\\bin\\windsurf.cmd',
-  ],
-  zed: [
-    '%LOCALAPPDATA%\\Zed\\zed.exe',
-  ],
+  code: ['%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\bin\\code.cmd'],
+  cursor: ['%LOCALAPPDATA%\\Programs\\cursor\\cursor.cmd'],
+  codium: ['%LOCALAPPDATA%\\Programs\\VSCodium\\bin\\codium.cmd'],
+  windsurf: ['%LOCALAPPDATA%\\Programs\\Windsurf\\bin\\windsurf.cmd'],
+  zed: ['%LOCALAPPDATA%\\Zed\\zed.exe'],
   qoder: [
     '%LOCALAPPDATA%\\Qoder\\bin\\qoder.cmd',
     '%LOCALAPPDATA%\\Programs\\Qoder\\bin\\qoder.cmd',
@@ -1822,28 +1815,137 @@ const WIN_APP_PATHS = {
   ],
 };
 
-const isCommandAvailable = async (cmd) => {
-  const whichCmd = process.platform === 'win32' ? 'where' : 'which';
-  try {
-    await execFileAsync(whichCmd, [cmd], { stdio: 'ignore' });
-    // execFileAsync resolves (no throw) only when exit code is 0
-    return true;
-  } catch {
-    // fall through to path probes
-  }
-  // On Windows, also probe well-known install directories.
-  if (process.platform === 'win32' && WIN_APP_PATHS[cmd]) {
-    for (const template of WIN_APP_PATHS[cmd]) {
-      const resolved = template.replace(/%([^%]+)%/g, (_, name) => process.env[name] || '');
-      try {
-        await fsp.access(resolved);
-        return true;
-      } catch {
-        // not found at this path, try next
-      }
-    }
+// Generic package-manager bin directories that may not be on the Electron
+// process's inherited PATH (e.g. fnm/nvm/volta add to PATH only inside the
+// user's interactive shell).
+const WIN_PACKAGE_MANAGER_BINS = () => {
+  const home = os.homedir();
+  return [
+    path.join(home, 'AppData', 'Roaming', 'npm'),     // npm global
+    path.join(home, 'AppData', 'Local', 'pnpm'),       // pnpm global
+    path.join(home, '.cargo', 'bin'),                   // cargo/rustup
+    path.join(home, '.volta', 'bin'),                   // volta
+    path.join(home, 'scoop', 'shims'),                  // scoop
+  ];
+};
+
+// Probe a single directory for cmd / cmd.exe / .exe / .bat variants.
+const probeDirForCommand = async (dir, cmd) => {
+  const exts = ['', '.cmd', '.exe', '.bat'];
+  for (const ext of exts) {
+    try {
+      await fsp.access(path.join(dir, cmd + ext));
+      return true;
+    } catch { /* not found */ }
   }
   return false;
+};
+
+// Use PowerShell Get-Command — slowest but understands aliases, functions,
+// and the user's full PATH including shell-profile additions.
+const psGetCommand = async (cmd) => {
+  if (process.platform !== 'win32') return false;
+  try {
+    const psScript = `Get-Command '${cmd}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source`;
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', psScript],
+      { timeout: 5000 },
+    );
+    const source = (stdout || '').trim();
+    return source.length > 0 && !source.includes('Get-Command');
+  } catch {
+    return false;
+  }
+};
+
+// Cascade detection: fast → medium → slow.
+const isCommandAvailable = async (cmd) => {
+  if (process.platform === 'win32') {
+    // 1) where.exe — fastest, checks inherited PATH only
+    try {
+      await execFileAsync('where', [cmd], { stdio: 'ignore' });
+      return true;
+    } catch { /* not in inherited PATH */ }
+
+    // 2) Well-known per-app install paths
+    if (WIN_APP_PATHS[cmd]) {
+      for (const tpl of WIN_APP_PATHS[cmd]) {
+        try {
+          await fsp.access(resolveEnvPath(tpl));
+          return true;
+        } catch { /* not at this path */ }
+      }
+    }
+
+    // 3) Generic package-manager bin directories (npm, pnpm, cargo, …)
+    for (const dir of WIN_PACKAGE_MANAGER_BINS()) {
+      if (await probeDirForCommand(dir, cmd)) return true;
+    }
+
+    // 4) PowerShell Get-Command — catches aliases, functions, and
+    //    PATH additions from shell profiles (fnm, nvm, volta, etc.)
+    return psGetCommand(cmd);
+  }
+
+  // macOS / Linux: standard which
+  try {
+    await execFileAsync('which', [cmd], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Resolve the full path for a CLI command on Windows, using the same
+// cascade as isCommandAvailable. Returns the command name as-is on
+// macOS/Linux (shell PATH resolution handles it).
+const resolveCommandPath = async (cmd) => {
+  if (process.platform !== 'win32') return cmd;
+
+  // 1) where.exe
+  try {
+    const { stdout } = await execFileAsync('where', [cmd]);
+    const first = (stdout || '').trim().split(/\r?\n/)[0];
+    if (first) return first;
+  } catch { /* continue */ }
+
+  // 2) Per-app install paths
+  if (WIN_APP_PATHS[cmd]) {
+    for (const tpl of WIN_APP_PATHS[cmd]) {
+      const resolved = resolveEnvPath(tpl);
+      try {
+        await fsp.access(resolved);
+        return resolved;
+      } catch { /* continue */ }
+    }
+  }
+
+  // 3) Package-manager bin directories
+  for (const dir of WIN_PACKAGE_MANAGER_BINS()) {
+    for (const ext of ['.cmd', '.exe', '.bat', '']) {
+      const full = path.join(dir, cmd + ext);
+      try {
+        await fsp.access(full);
+        return full;
+      } catch { /* continue */ }
+    }
+  }
+
+  // 4) PowerShell Get-Command
+  try {
+    const psScript = `Get-Command '${cmd}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source`;
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', psScript],
+      { timeout: 5000 },
+    );
+    const source = (stdout || '').trim();
+    if (source && !source.includes('Get-Command')) return source;
+  } catch { /* continue */ }
+
+  // Fallback: return bare name and hope spawnSync finds it
+  return cmd;
 };
 
 const buildOpenProjectSpecs = ({ projectPath, appId, appName }) => {
@@ -1866,10 +1968,11 @@ const buildOpenProjectSpecs = ({ projectPath, appId, appName }) => {
     return specs;
   }
 
-  // Windows / Linux
+  // Windows / Linux — resolve full path so spawnSync finds the binary
+  // even when the CLI isn't on the Electron process's inherited PATH.
   const cli = CLI_BY_APP_ID[appId];
   if (cli) {
-    return [{ program: cli, args: [projectPath] }];
+    return [{ program: cli, _resolve: true, args: [projectPath] }];
   }
   // Terminal emulators: open containing directory
   if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
@@ -1897,10 +2000,10 @@ const buildOpenFileSpecs = ({ filePath, appId, appName }) => {
     return specs;
   }
 
-  // Windows / Linux
+  // Windows / Linux — resolve full path for the same reason as above
   const cli = CLI_BY_APP_ID[appId];
   if (cli) {
-    return [{ program: cli, args: [filePath] }];
+    return [{ program: cli, _resolve: true, args: [filePath] }];
   }
   // Terminal emulators: open containing directory
   if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
@@ -1910,18 +2013,19 @@ const buildOpenFileSpecs = ({ filePath, appId, appName }) => {
   return [{ program: process.platform === 'win32' ? 'cmd' : 'xdg-open', args: process.platform === 'win32' ? ['/c', 'start', filePath] : [filePath] }];
 };
 
-const runSpecChain = (specs, appName) => {
+const runSpecChain = async (specs, appName) => {
   const failures = [];
   for (const spec of specs) {
-    const result = spawnSync(spec.program, spec.args, { stdio: 'ignore' });
+    const program = spec._resolve ? await resolveCommandPath(spec.program) : spec.program;
+    const result = spawnSync(program, spec.args, { stdio: 'ignore' });
     if (result.error) {
-      failures.push(`${spec.program}: ${result.error.message}`);
+      failures.push(`${program}: ${result.error.message}`);
       continue;
     }
     if (result.status === 0) {
       return;
     }
-    failures.push(`${spec.program} exited ${result.status}`);
+    failures.push(`${program} exited ${result.status}`);
   }
   throw new Error(`Failed to open in ${appName}: ${failures.join('; ')}`);
 };
@@ -2124,7 +2228,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       if (!projectPath || !appId || !appName) {
         throw new Error('Project path, app id, and app name are required');
       }
-      runSpecChain(buildOpenProjectSpecs({ projectPath, appId, appName }), appName);
+      await runSpecChain(buildOpenProjectSpecs({ projectPath, appId, appName }), appName);
       return null;
     }
 
@@ -2135,7 +2239,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       if (!filePath || !appId || !appName) {
         throw new Error('File path, app id, and app name are required');
       }
-      runSpecChain(buildOpenFileSpecs({ filePath, appId, appName }), appName);
+      await runSpecChain(buildOpenFileSpecs({ filePath, appId, appName }), appName);
       return null;
     }
 
