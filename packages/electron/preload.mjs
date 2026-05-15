@@ -15,6 +15,7 @@ const localOrigin = readArgValue('--openchamber-local-origin');
 const homeDirectory = readArgValue('--openchamber-home');
 const macosMajorRaw = readArgValue('--openchamber-macos-major');
 const macosMajor = Number.parseInt(macosMajorRaw, 10);
+const platform = readArgValue('--openchamber-platform');
 
 // Preload re-executes on every cross-origin navigation (we run with
 // sandbox:false, per-document). Two separate concerns to balance:
@@ -60,6 +61,9 @@ if (isLocalPage && homeDirectory) {
 // presentation only, safe to expose.
 if (Number.isFinite(macosMajor) && macosMajor > 0) {
   contextBridge.exposeInMainWorld('__OPENCHAMBER_MACOS_MAJOR__', macosMajor);
+}
+if (platform) {
+  contextBridge.exposeInMainWorld('__OPENCHAMBER_PLATFORM__', platform);
 }
 
 contextBridge.exposeInMainWorld('__OPENCHAMBER_ELECTRON__', {

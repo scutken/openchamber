@@ -1181,6 +1181,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
         `--openchamber-home=${desktopHome}`,
         `--openchamber-macos-major=${desktopMacosMajor}`,
         `--openchamber-boot-outcome=${JSON.stringify(state.bootOutcome || null)}`,
+        `--openchamber-platform=${process.platform}`,
       ],
       preload: isDev ? path.join(__dirname, 'preload.mjs') : path.join(app.getAppPath(), 'preload.mjs'),
       backgroundThrottling: true,
@@ -1437,6 +1438,7 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
         `--openchamber-local-origin=${desktopLocalOrigin}`,
         `--openchamber-home=${desktopHome}`,
         `--openchamber-macos-major=${desktopMacosMajor}`,
+        `--openchamber-platform=${process.platform}`,
       ],
       preload: isDev ? path.join(__dirname, 'preload.mjs') : path.join(app.getAppPath(), 'preload.mjs'),
       backgroundThrottling: true,
@@ -1795,14 +1797,52 @@ const CLI_BY_APP_ID = {
   qoder: 'qoder',
 };
 
+// Common Windows install paths for apps whose CLI may not be on PATH.
+// Keys are CLI command names, values are arrays of candidate paths to probe.
+const WIN_APP_PATHS = {
+  code: [
+    '%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\bin\\code.cmd',
+  ],
+  cursor: [
+    '%LOCALAPPDATA%\\Programs\\cursor\\cursor.cmd',
+  ],
+  codium: [
+    '%LOCALAPPDATA%\\Programs\\VSCodium\\bin\\codium.cmd',
+  ],
+  windsurf: [
+    '%LOCALAPPDATA%\\Programs\\Windsurf\\bin\\windsurf.cmd',
+  ],
+  zed: [
+    '%LOCALAPPDATA%\\Zed\\zed.exe',
+  ],
+  qoder: [
+    '%LOCALAPPDATA%\\Qoder\\bin\\qoder.cmd',
+    '%LOCALAPPDATA%\\Programs\\Qoder\\bin\\qoder.cmd',
+    '%PROGRAMFILES%\\Qoder\\bin\\qoder.cmd',
+  ],
+};
+
 const isCommandAvailable = async (cmd) => {
   const whichCmd = process.platform === 'win32' ? 'where' : 'which';
   try {
     const { status } = await execFileAsync(whichCmd, [cmd], { stdio: 'ignore' });
-    return status === 0;
+    if (status === 0) return true;
   } catch {
-    return false;
+    // fall through to path probes
   }
+  // On Windows, also probe well-known install directories.
+  if (process.platform === 'win32' && WIN_APP_PATHS[cmd]) {
+    for (const template of WIN_APP_PATHS[cmd]) {
+      const resolved = template.replace(/%([^%]+)%/g, (_, name) => process.env[name] || '');
+      try {
+        await fsp.access(resolved);
+        return true;
+      } catch {
+        // not found at this path, try next
+      }
+    }
+  }
+  return false;
 };
 
 const buildOpenProjectSpecs = ({ projectPath, appId, appName }) => {

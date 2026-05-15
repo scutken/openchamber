@@ -733,6 +733,17 @@ export const Header: React.FC<HeaderProps> = ({
     return /Macintosh|Mac OS X/.test(navigator.userAgent || '');
   }, []);
 
+  const isWinPlatform = React.useMemo(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    const injected = (window as unknown as { __OPENCHAMBER_PLATFORM__?: string }).__OPENCHAMBER_PLATFORM__;
+    if (typeof injected === 'string') {
+      return injected === 'win32';
+    }
+    return /Windows|Win32|Win64/i.test(navigator.userAgent || '');
+  }, []);
+
   const macosMajorVersion = React.useMemo(() => {
     if (typeof window === 'undefined') {
       return null;
@@ -1845,6 +1856,21 @@ export const Header: React.FC<HeaderProps> = ({
   const desktopSidebarActionsInline = !isRightSidebarOpen || !desktopRightSidebarActionsHost;
   const showMiniChatHeaderAction = hasElectronDesktopIPC && (isNewSessionDraftOpen || Boolean(currentSessionId));
 
+  const windowsTitleBarOverlayPaddingStyle = React.useMemo<React.CSSProperties | undefined>(() => {
+    if (!isDesktopApp || !isWinPlatform) {
+      return undefined;
+    }
+    // Windows titleBarOverlay: 3 buttons (min/max/close) at ~46px each ≈ 138px
+    return { paddingRight: 138 };
+  }, [isDesktopApp, isWinPlatform]);
+
+  const mergedDesktopHeaderStyle = React.useMemo<React.CSSProperties | undefined>(() => {
+    if (windowsTitleBarOverlayPaddingStyle && webWindowControlsOverlayStyle) {
+      return { ...webWindowControlsOverlayStyle, ...windowsTitleBarOverlayPaddingStyle };
+    }
+    return windowsTitleBarOverlayPaddingStyle ?? webWindowControlsOverlayStyle;
+  }, [windowsTitleBarOverlayPaddingStyle, webWindowControlsOverlayStyle]);
+
   const renderDesktop = () => (
     <div
       onMouseDown={handleDragStart}
@@ -1853,7 +1879,7 @@ export const Header: React.FC<HeaderProps> = ({
         desktopPaddingClass,
         macosHeaderSizeClass
       )}
-      style={webWindowControlsOverlayStyle}
+      style={mergedDesktopHeaderStyle}
       role="tablist"
       aria-label={t('header.navigation.mainAria')}
     >
