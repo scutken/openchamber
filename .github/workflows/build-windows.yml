@@ -47,10 +47,13 @@ jobs:
             electron-${{ runner.os }}-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts || (echo "Retrying without postinstall..." && bun install --frozen-lockfile)
-
-      - name: Install patches
-        run: npx patch-package || true
+        shell: bash
+        run: |
+          # Windows bun install workaround: disable postinstall, install deps, then run patches separately
+          npm pkg set scripts.postinstall="echo skipped" || true
+          bun install --frozen-lockfile
+          npm pkg delete scripts.postinstall || true
+          npx patch-package || echo "patch-package failed, continuing"
 
       - name: Build Electron app (Windows)
         working-directory: packages/electron
