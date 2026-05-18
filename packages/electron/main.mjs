@@ -1168,8 +1168,11 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
     // Tauri used an overlay title bar with explicit traffic-light placement.
     // Electron's hiddenInset adds its own extra inset, which leaves the controls
     // visibly lower than the app header. Use a plain hidden title bar instead.
+    // On Windows, frame:false removes the native title bar entirely — custom
+    // window control buttons are rendered by the Header component via IPC.
     titleBarStyle: 'hidden',
-    titleBarOverlay: process.platform === 'win32' ? { height: 36 } : undefined,
+    frame: process.platform === 'win32' ? false : undefined,
+    titleBarOverlay: undefined,
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     webPreferences: {
       additionalArguments: [
@@ -1423,7 +1426,8 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     show: false,
     backgroundColor: '#151313',
     titleBarStyle: 'hidden',
-    titleBarOverlay: process.platform === 'win32' ? { height: 36 } : undefined,
+    frame: process.platform === 'win32' ? false : undefined,
+    titleBarOverlay: undefined,
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     webPreferences: {
       additionalArguments: [
@@ -2009,7 +2013,10 @@ const runSpecChain = async (specs, appName) => {
   const failures = [];
   for (const spec of specs) {
     const program = spec._resolve ? await resolveCommandPath(spec.program) : spec.program;
-    const result = spawnSync(program, spec.args, { stdio: 'ignore' });
+    // On Windows, .cmd/.bat files require shell: true to execute via cmd.exe.
+    // Without it, spawnSync fails to find/launch batch scripts (e.g. code.cmd).
+    const needsShell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(program);
+    const result = spawnSync(program, spec.args, { stdio: 'ignore', shell: needsShell });
     if (result.error) {
       failures.push(`${program}: ${result.error.message}`);
       continue;
@@ -2025,7 +2032,31 @@ const runSpecChain = async (specs, appName) => {
 const handleInvoke = async (browserWindow, command, args = {}) => {
   switch (command) {
     case 'desktop_start_window_drag':
+      // macOS: titleBarStyle:'hidden' + CSS -webkit-app-region:drag handles this.
+      // Windows (frame:false): use native WM_NCLBUTTONDOWN drag via ffi-napi
+      // is complex, so we rely on CSS -webkit-app-region:drag on the header
+      // which works with frame:false. This handler exists for future extensibility.
       return null;
+
+    case 'desktop_minimize_window':
+      if (browserWindow) browserWindow.minimize();
+      return null;
+
+    case 'desktop_maximize_window':
+      if (!browserWindow) return null;
+      if (browserWindow.isMaximized()) {
+        browserWindow.unmaximize();
+      } else {
+        browserWindow.maximize();
+      }
+      return null;
+
+    case 'desktop_close_window':
+      if (browserWindow) browserWindow.close();
+      return null;
+
+    case 'desktop_is_window_maximized':
+      return Boolean(browserWindow?.isMaximized());
 
     case 'desktop_is_window_fullscreen':
       return Boolean(browserWindow?.isFullScreen());
@@ -2758,6 +2789,10 @@ const COMMANDS_SAFE_FOR_REMOTE = new Set([
   'desktop_set_window_theme',
   'desktop_is_window_fullscreen',
   'desktop_start_window_drag',
+  'desktop_minimize_window',
+  'desktop_maximize_window',
+  'desktop_close_window',
+  'desktop_is_window_maximized',
   'desktop_get_app_version',
   'desktop_get_lan_address',
   'desktop_capture_page_rect',

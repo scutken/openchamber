@@ -332,6 +332,19 @@ export const isWebRuntime = (): boolean => {
   return !isVSCodeRuntime();
 };
 
+/** True when running inside the Electron desktop shell on Windows. */
+export const isWindowsDesktop = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  if (!isElectronShell()) return false;
+  const args = window.location.search || '';
+  // The Electron preload passes platform via process.argv, but the renderer
+  // can also infer it from the __OPENCHAMBER_ELECTRON__ global + UA sniff.
+  // A more reliable approach: check if the platform arg was forwarded.
+  // Since Electron doesn't expose process.platform to renderer, we infer
+  // from the UA string which includes "Windows" on Windows builds.
+  return navigator.userAgent.includes('Windows');
+};
+
 export const getDesktopHomeDirectory = async (): Promise<string | null> => {
   if (typeof window !== 'undefined') {
     const embedded = window.__OPENCHAMBER_HOME__;

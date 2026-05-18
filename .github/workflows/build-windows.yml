@@ -57,7 +57,7 @@ jobs:
           bun run build:web-assets
           bun run bundle:main
           bun run rebuild:native
-          .\node_modules\.bin\electron-builder --win --publish=never
+          .\node_modules\.bin\electron-builder --win nsis portable --publish=never
 
       - name: List artifacts
         shell: bash
