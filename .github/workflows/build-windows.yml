@@ -30,14 +30,6 @@ jobs:
           restore-keys: |
             bun-${{ steps.bun-version.outputs.version }}-${{ runner.os }}-
 
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
-          restore-keys: |
-            node-modules-${{ runner.os }}-
-
       - name: Cache electron binary
         uses: actions/cache@v4
         with:
@@ -47,13 +39,17 @@ jobs:
             electron-${{ runner.os }}-
 
       - name: Install dependencies
-        shell: bash
+        shell: pwsh
         run: |
-          # Windows bun install workaround: disable postinstall, install deps, then run patches separately
-          npm pkg set scripts.postinstall="echo skipped" || true
+          # Workaround for Windows bun install EPERM on postinstall (patch-package)
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $pkg.scripts.postinstall = "Write-Host 'postinstall skipped'"
+          $pkg | ConvertTo-Json -Depth 100 | Set-Content package.json -Encoding UTF8
           bun install --frozen-lockfile
-          npm pkg delete scripts.postinstall || true
-          npx patch-package || echo "patch-package failed, continuing"
+          # Restore original package.json
+          git checkout package.json
+        env:
+          BUN_INSTALL_SKIP_POSTINSTALL: "1"
 
       - name: Build Electron app (Windows)
         working-directory: packages/electron
