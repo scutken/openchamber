@@ -108,8 +108,6 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "portable": {
-      "splashImage": "resources/icons/icon.ico"
-    }
+    "portable": {}
   }
 }
