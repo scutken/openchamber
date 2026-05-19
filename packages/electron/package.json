@@ -108,6 +108,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "portable": {}
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+    }
   }
 }
