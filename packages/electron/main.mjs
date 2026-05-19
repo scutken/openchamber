@@ -1168,11 +1168,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
     // Tauri used an overlay title bar with explicit traffic-light placement.
     // Electron's hiddenInset adds its own extra inset, which leaves the controls
     // visibly lower than the app header. Use a plain hidden title bar instead.
-    // On Windows, frame:false removes the native title bar entirely — custom
-    // window control buttons are rendered by the Header component via IPC.
-    titleBarStyle: 'hidden',
-    frame: process.platform === 'win32' ? false : undefined,
-    titleBarOverlay: undefined,
+    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     webPreferences: {
       additionalArguments: [
@@ -1180,7 +1176,6 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
         `--openchamber-home=${desktopHome}`,
         `--openchamber-macos-major=${desktopMacosMajor}`,
         `--openchamber-boot-outcome=${JSON.stringify(state.bootOutcome || null)}`,
-        `--openchamber-platform=${process.platform}`,
       ],
       preload: isDev ? path.join(__dirname, 'preload.mjs') : path.join(app.getAppPath(), 'preload.mjs'),
       backgroundThrottling: true,
@@ -1425,16 +1420,13 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     minHeight: MINI_CHAT_MIN_WINDOW_HEIGHT,
     show: false,
     backgroundColor: '#151313',
-    titleBarStyle: 'hidden',
-    frame: process.platform === 'win32' ? false : undefined,
-    titleBarOverlay: undefined,
+    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     webPreferences: {
       additionalArguments: [
         `--openchamber-local-origin=${desktopLocalOrigin}`,
         `--openchamber-home=${desktopHome}`,
         `--openchamber-macos-major=${desktopMacosMajor}`,
-        `--openchamber-platform=${process.platform}`,
       ],
       preload: isDev ? path.join(__dirname, 'preload.mjs') : path.join(app.getAppPath(), 'preload.mjs'),
       backgroundThrottling: true,
@@ -1790,241 +1782,65 @@ const CLI_BY_APP_ID = {
   vscodium: 'codium',
   windsurf: 'windsurf',
   zed: 'zed',
-  qoder: 'qoder',
-};
-
-// Resolve a template path containing %VAR% references against process.env.
-const resolveEnvPath = (template) =>
-  template.replace(/%([^%]+)%/g, (_, name) => process.env[name] || '');
-
-// Well-known per-app install paths (non-PATH) — checked after PATH scan.
-const WIN_APP_PATHS = {
-  code: ['%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\bin\\code.cmd'],
-  cursor: ['%LOCALAPPDATA%\\Programs\\cursor\\cursor.cmd'],
-  codium: ['%LOCALAPPDATA%\\Programs\\VSCodium\\bin\\codium.cmd'],
-  windsurf: ['%LOCALAPPDATA%\\Programs\\Windsurf\\bin\\windsurf.cmd'],
-  zed: ['%LOCALAPPDATA%\\Zed\\zed.exe'],
-  qoder: [
-    '%LOCALAPPDATA%\\Qoder\\bin\\qoder.cmd',
-    '%LOCALAPPDATA%\\Programs\\Qoder\\bin\\qoder.cmd',
-    '%PROGRAMFILES%\\Qoder\\bin\\qoder.cmd',
-  ],
-};
-
-// Generic package-manager bin directories that may not be on the Electron
-// process's inherited PATH (e.g. fnm/nvm/volta add to PATH only inside the
-// user's interactive shell).
-const WIN_PACKAGE_MANAGER_BINS = () => {
-  const home = os.homedir();
-  return [
-    path.join(home, 'AppData', 'Roaming', 'npm'),     // npm global
-    path.join(home, 'AppData', 'Local', 'pnpm'),       // pnpm global
-    path.join(home, '.cargo', 'bin'),                   // cargo/rustup
-    path.join(home, '.volta', 'bin'),                   // volta
-    path.join(home, 'scoop', 'shims'),                  // scoop
-  ];
-};
-
-// Probe a single directory for cmd / cmd.exe / .exe / .bat variants.
-const probeDirForCommand = async (dir, cmd) => {
-  const exts = ['', '.cmd', '.exe', '.bat'];
-  for (const ext of exts) {
-    try {
-      await fsp.access(path.join(dir, cmd + ext));
-      return true;
-    } catch { /* not found */ }
-  }
-  return false;
-};
-
-// Use PowerShell Get-Command — slowest but understands aliases, functions,
-// and the user's full PATH including shell-profile additions.
-const psGetCommand = async (cmd) => {
-  if (process.platform !== 'win32') return false;
-  try {
-    const psScript = `Get-Command '${cmd}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source`;
-    const { stdout } = await execFileAsync(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', psScript],
-      { timeout: 5000 },
-    );
-    const source = (stdout || '').trim();
-    return source.length > 0 && !source.includes('Get-Command');
-  } catch {
-    return false;
-  }
-};
-
-// Cascade detection: fast → medium → slow.
-const isCommandAvailable = async (cmd) => {
-  if (process.platform === 'win32') {
-    // 1) where.exe — fastest, checks inherited PATH only
-    try {
-      await execFileAsync('where', [cmd], { stdio: 'ignore' });
-      return true;
-    } catch { /* not in inherited PATH */ }
-
-    // 2) Well-known per-app install paths
-    if (WIN_APP_PATHS[cmd]) {
-      for (const tpl of WIN_APP_PATHS[cmd]) {
-        try {
-          await fsp.access(resolveEnvPath(tpl));
-          return true;
-        } catch { /* not at this path */ }
-      }
-    }
-
-    // 3) Generic package-manager bin directories (npm, pnpm, cargo, …)
-    for (const dir of WIN_PACKAGE_MANAGER_BINS()) {
-      if (await probeDirForCommand(dir, cmd)) return true;
-    }
-
-    // 4) PowerShell Get-Command — catches aliases, functions, and
-    //    PATH additions from shell profiles (fnm, nvm, volta, etc.)
-    return psGetCommand(cmd);
-  }
-
-  // macOS / Linux: standard which
-  try {
-    await execFileAsync('which', [cmd], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-// Resolve the full path for a CLI command on Windows, using the same
-// cascade as isCommandAvailable. Returns the command name as-is on
-// macOS/Linux (shell PATH resolution handles it).
-const resolveCommandPath = async (cmd) => {
-  if (process.platform !== 'win32') return cmd;
-
-  // 1) where.exe
-  try {
-    const { stdout } = await execFileAsync('where', [cmd]);
-    const first = (stdout || '').trim().split(/\r?\n/)[0];
-    if (first) return first;
-  } catch { /* continue */ }
-
-  // 2) Per-app install paths
-  if (WIN_APP_PATHS[cmd]) {
-    for (const tpl of WIN_APP_PATHS[cmd]) {
-      const resolved = resolveEnvPath(tpl);
-      try {
-        await fsp.access(resolved);
-        return resolved;
-      } catch { /* continue */ }
-    }
-  }
-
-  // 3) Package-manager bin directories
-  for (const dir of WIN_PACKAGE_MANAGER_BINS()) {
-    for (const ext of ['.cmd', '.exe', '.bat', '']) {
-      const full = path.join(dir, cmd + ext);
-      try {
-        await fsp.access(full);
-        return full;
-      } catch { /* continue */ }
-    }
-  }
-
-  // 4) PowerShell Get-Command
-  try {
-    const psScript = `Get-Command '${cmd}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source`;
-    const { stdout } = await execFileAsync(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', psScript],
-      { timeout: 5000 },
-    );
-    const source = (stdout || '').trim();
-    if (source && !source.includes('Get-Command')) return source;
-  } catch { /* continue */ }
-
-  // Fallback: return bare name and hope spawnSync finds it
-  return cmd;
 };
 
 const buildOpenProjectSpecs = ({ projectPath, appId, appName }) => {
-  if (process.platform === 'darwin') {
-    if (appId === 'finder') {
-      return [{ program: 'open', args: [projectPath] }];
-    }
-    if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
-      return [{ program: 'open', args: ['-a', appName, projectPath] }];
-    }
-    const specs = [];
-    const cli = CLI_BY_APP_ID[appId];
-    if (cli) {
-      specs.push({ program: cli, args: ['-n', projectPath] });
-    }
-    if (JETBRAINS_APP_IDS.has(appId)) {
-      specs.push({ program: 'open', args: ['-na', appName, '--args', projectPath] });
-    }
-    specs.push({ program: 'open', args: ['-a', appName, projectPath] });
-    return specs;
+  if (appId === 'finder') {
+    return [{ program: 'open', args: [projectPath] }];
   }
 
-  // Windows / Linux — resolve full path so spawnSync finds the binary
-  // even when the CLI isn't on the Electron process's inherited PATH.
+  if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
+    return [{ program: 'open', args: ['-a', appName, projectPath] }];
+  }
+
+  const specs = [];
+
   const cli = CLI_BY_APP_ID[appId];
   if (cli) {
-    return [{ program: cli, _resolve: true, args: [projectPath] }];
+    specs.push({ program: cli, args: ['-n', projectPath] });
   }
-  // Terminal emulators: open containing directory
-  if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
-    return [{ program: 'xdg-open', args: [projectPath] }];
+
+  if (JETBRAINS_APP_IDS.has(appId)) {
+    specs.push({ program: 'open', args: ['-na', appName, '--args', projectPath] });
   }
-  // Fallback: use shell.openPath via a spawned process
-  return [{ program: process.platform === 'win32' ? 'cmd' : 'xdg-open', args: process.platform === 'win32' ? ['/c', 'start', projectPath] : [projectPath] }];
+
+  specs.push({ program: 'open', args: ['-a', appName, projectPath] });
+  return specs;
 };
 
 const buildOpenFileSpecs = ({ filePath, appId, appName }) => {
-  if (process.platform === 'darwin') {
-    if (appId === 'finder') {
-      return [{ program: 'open', args: ['-R', filePath] }];
-    }
-    const parentDir = path.dirname(filePath);
-    if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
-      return [{ program: 'open', args: ['-a', appName, parentDir] }];
-    }
-    const specs = [];
-    const cli = CLI_BY_APP_ID[appId];
-    if (cli) {
-      specs.push({ program: cli, args: [filePath] });
-    }
-    specs.push({ program: 'open', args: ['-a', appName, filePath] });
-    return specs;
+  if (appId === 'finder') {
+    return [{ program: 'open', args: ['-R', filePath] }];
   }
 
-  // Windows / Linux — resolve full path for the same reason as above
+  const parentDir = path.dirname(filePath);
+  if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
+    return [{ program: 'open', args: ['-a', appName, parentDir] }];
+  }
+
+  const specs = [];
+
   const cli = CLI_BY_APP_ID[appId];
   if (cli) {
-    return [{ program: cli, _resolve: true, args: [filePath] }];
+    specs.push({ program: cli, args: [filePath] });
   }
-  // Terminal emulators: open containing directory
-  if (appId === 'terminal' || appId === 'iterm2' || appId === 'ghostty') {
-    return [{ program: process.platform === 'win32' ? 'cmd' : 'xdg-open', args: process.platform === 'win32' ? ['/c', 'start', path.dirname(filePath)] : [path.dirname(filePath)] }];
-  }
-  // Fallback: open the file with the default handler
-  return [{ program: process.platform === 'win32' ? 'cmd' : 'xdg-open', args: process.platform === 'win32' ? ['/c', 'start', filePath] : [filePath] }];
+
+  specs.push({ program: 'open', args: ['-a', appName, filePath] });
+  return specs;
 };
 
-const runSpecChain = async (specs, appName) => {
+const runSpecChain = (specs, appName) => {
   const failures = [];
   for (const spec of specs) {
-    const program = spec._resolve ? await resolveCommandPath(spec.program) : spec.program;
-    // On Windows, .cmd/.bat files require shell: true to execute via cmd.exe.
-    // Without it, spawnSync fails to find/launch batch scripts (e.g. code.cmd).
-    const needsShell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(program);
-    const result = spawnSync(program, spec.args, { stdio: 'ignore', shell: needsShell });
+    const result = spawnSync(spec.program, spec.args, { stdio: 'ignore' });
     if (result.error) {
-      failures.push(`${program}: ${result.error.message}`);
+      failures.push(`${spec.program}: ${result.error.message}`);
       continue;
     }
     if (result.status === 0) {
       return;
     }
-    failures.push(`${program} exited ${result.status}`);
+    failures.push(`${spec.program} exited ${result.status}`);
   }
   throw new Error(`Failed to open in ${appName}: ${failures.join('; ')}`);
 };
@@ -2032,31 +1848,7 @@ const runSpecChain = async (specs, appName) => {
 const handleInvoke = async (browserWindow, command, args = {}) => {
   switch (command) {
     case 'desktop_start_window_drag':
-      // macOS: titleBarStyle:'hidden' + CSS -webkit-app-region:drag handles this.
-      // Windows (frame:false): use native WM_NCLBUTTONDOWN drag via ffi-napi
-      // is complex, so we rely on CSS -webkit-app-region:drag on the header
-      // which works with frame:false. This handler exists for future extensibility.
       return null;
-
-    case 'desktop_minimize_window':
-      if (browserWindow) browserWindow.minimize();
-      return null;
-
-    case 'desktop_maximize_window':
-      if (!browserWindow) return null;
-      if (browserWindow.isMaximized()) {
-        browserWindow.unmaximize();
-      } else {
-        browserWindow.maximize();
-      }
-      return null;
-
-    case 'desktop_close_window':
-      if (browserWindow) browserWindow.close();
-      return null;
-
-    case 'desktop_is_window_maximized':
-      return Boolean(browserWindow?.isMaximized());
 
     case 'desktop_is_window_fullscreen':
       return Boolean(browserWindow?.isFullScreen());
@@ -2245,51 +2037,40 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     }
 
     case 'desktop_open_in_app': {
+      if (process.platform !== 'darwin') {
+        throw new Error('desktop_open_in_app is only supported on macOS');
+      }
       const projectPath = typeof args.projectPath === 'string' ? args.projectPath.trim() : '';
       const appId = typeof args.appId === 'string' ? args.appId.trim().toLowerCase() : '';
       const appName = typeof args.appName === 'string' ? args.appName.trim() : '';
       if (!projectPath || !appId || !appName) {
         throw new Error('Project path, app id, and app name are required');
       }
-      await runSpecChain(buildOpenProjectSpecs({ projectPath, appId, appName }), appName);
+      runSpecChain(buildOpenProjectSpecs({ projectPath, appId, appName }), appName);
       return null;
     }
 
     case 'desktop_open_file_in_app': {
+      if (process.platform !== 'darwin') {
+        throw new Error('desktop_open_file_in_app is only supported on macOS');
+      }
       const filePath = typeof args.filePath === 'string' ? args.filePath.trim() : '';
       const appId = typeof args.appId === 'string' ? args.appId.trim().toLowerCase() : '';
       const appName = typeof args.appName === 'string' ? args.appName.trim() : '';
       if (!filePath || !appId || !appName) {
         throw new Error('File path, app id, and app name are required');
       }
-      await runSpecChain(buildOpenFileSpecs({ filePath, appId, appName }), appName);
+      runSpecChain(buildOpenFileSpecs({ filePath, appId, appName }), appName);
       return null;
     }
 
     case 'desktop_filter_installed_apps': {
-      if (!Array.isArray(args.apps)) return [];
-      if (process.platform === 'darwin') {
-        const results = await Promise.all(
-          args.apps.map(async (appName) => (await isAppBundleInstalled(String(appName))) ? String(appName) : null)
-        );
-        return results.filter(Boolean);
+      if (process.platform !== 'darwin') {
+        throw new Error('desktop_filter_installed_apps is only supported on macOS');
       }
-      // Windows / Linux: detect apps by their CLI commands
-      const cliByAppName = {
-        'VS Code': 'code',
-        'Visual Studio Code': 'code',
-        'Cursor': 'cursor',
-        'VSCodium': 'codium',
-        'Windsurf': 'windsurf',
-        'Zed': 'zed',
-        'Qoder': 'qoder',
-      };
+      if (!Array.isArray(args.apps)) return [];
       const results = await Promise.all(
-        args.apps.map(async (appName) => {
-          const cli = cliByAppName[String(appName)];
-          if (cli && (await isCommandAvailable(cli))) return String(appName);
-          return null;
-        })
+        args.apps.map(async (appName) => (await isAppBundleInstalled(String(appName))) ? String(appName) : null)
       );
       return results.filter(Boolean);
     }
@@ -2310,6 +2091,9 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     }
 
     case 'desktop_get_installed_apps': {
+      if (process.platform !== 'darwin') {
+        throw new Error('desktop_get_installed_apps is only supported on macOS');
+      }
       const cachePath = buildInstalledAppsCachePath();
       const now = Math.floor(Date.now() / 1000);
       let cache = null;
@@ -2320,29 +2104,8 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       const cachedApps = Array.isArray(cache?.apps) ? cache.apps : [];
       const hasCache = Boolean(cache);
       const isCacheStale = !cache || (now - Number(cache.updatedAt || 0)) > INSTALLED_APPS_CACHE_TTL_SECS;
-      const buildInstalledAppsNonDarwin = async (apps) => {
-        const cliByAppName = {
-          'VS Code': 'code',
-          'Visual Studio Code': 'code',
-          'Cursor': 'cursor',
-          'VSCodium': 'codium',
-          'Windsurf': 'windsurf',
-          'Zed': 'zed',
-          'Qoder': 'qoder',
-        };
-        const results = [];
-        for (const name of apps) {
-          const cli = cliByAppName[String(name)];
-          if (cli && (await isCommandAvailable(cli))) {
-            results.push({ name: String(name), iconDataUrl: null });
-          }
-        }
-        return results;
-      };
       const refresh = async () => {
-        const apps = process.platform === 'darwin'
-          ? await buildInstalledApps(Array.isArray(args.apps) ? args.apps : [])
-          : await buildInstalledAppsNonDarwin(Array.isArray(args.apps) ? args.apps : []);
+        const apps = await buildInstalledApps(Array.isArray(args.apps) ? args.apps : []);
         await fsp.mkdir(path.dirname(cachePath), { recursive: true });
         await fsp.writeFile(cachePath, JSON.stringify({ updatedAt: now, apps }, null, 2));
         emitToAllWindows('openchamber:installed-apps-updated', apps);
@@ -2789,10 +2552,6 @@ const COMMANDS_SAFE_FOR_REMOTE = new Set([
   'desktop_set_window_theme',
   'desktop_is_window_fullscreen',
   'desktop_start_window_drag',
-  'desktop_minimize_window',
-  'desktop_maximize_window',
-  'desktop_close_window',
-  'desktop_is_window_maximized',
   'desktop_get_app_version',
   'desktop_get_lan_address',
   'desktop_capture_page_rect',

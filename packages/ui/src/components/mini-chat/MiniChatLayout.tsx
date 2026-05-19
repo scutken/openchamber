@@ -197,20 +197,7 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
     };
   }, [contextLimit, currentSessionId, currentSessionMessages, outputLimit]);
   const [stableContextUsage, setStableContextUsage] = React.useState<SessionContextUsage | null>(null);
-  const isWinPlatform = React.useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const injected = (window as unknown as { __OPENCHAMBER_PLATFORM__?: string }).__OPENCHAMBER_PLATFORM__;
-    if (typeof injected === 'string') return injected === 'win32';
-    return /Windows|Win32|Win64/i.test(navigator?.userAgent || '');
-  }, []);
-
-  const dragRegionStyle = React.useMemo(() => {
-    const base: React.CSSProperties = { WebkitAppRegion: 'drag' };
-    if (isWinPlatform) {
-      return { ...base, paddingRight: 138 };
-    }
-    return base;
-  }, [isWinPlatform]);
+  const dragRegionStyle = { WebkitAppRegion: 'drag' } as React.CSSProperties;
   const noDragRegionStyle = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
 
   React.useEffect(() => {

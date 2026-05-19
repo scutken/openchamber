@@ -64,14 +64,13 @@ import { forceKillTerminal } from '@/lib/terminalApi';
 import { useTerminalStore } from '@/stores/useTerminalStore';
 import { ProjectActionsButton } from '@/components/layout/ProjectActionsButton';
 import { SessionSwitcherDropdown } from '@/components/session/SessionSwitcherDropdown';
-import { canUseElectronDesktopIPC, invokeDesktop, isDesktopShell, isVSCodeRuntime, isWindowsDesktop, startDesktopWindowDrag } from '@/lib/desktop';
+import { canUseElectronDesktopIPC, invokeDesktop, isDesktopShell, isVSCodeRuntime, startDesktopWindowDrag } from '@/lib/desktop';
 import { desktopHostsGet, locationMatchesHost, redactSensitiveUrl } from '@/lib/desktopHosts';
 import { resolveSessionDiffStats } from '@/components/session/sidebar/utils';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
 import type { Session } from '@opencode-ai/sdk/v2/client';
 import type { IconName } from "@/components/icon/icons";
-import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
 
 const DESKTOP_HEADER_ICON_BUTTON_CLASS = 'app-region-no-drag inline-flex h-8 w-8 items-center justify-center gap-2 rounded-md typography-ui-label font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 hover:bg-interactive-hover transition-colors';
 const MOBILE_HEADER_ICON_BUTTON_CLASS = 'app-region-no-drag inline-flex h-9 w-9 items-center justify-center gap-2 p-2 rounded-md typography-ui-label font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 hover:text-foreground hover:bg-interactive-hover transition-colors';
@@ -734,17 +733,6 @@ export const Header: React.FC<HeaderProps> = ({
       return false;
     }
     return /Macintosh|Mac OS X/.test(navigator.userAgent || '');
-  }, []);
-
-  const isWinPlatform = React.useMemo(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-    const injected = (window as unknown as { __OPENCHAMBER_PLATFORM__?: string }).__OPENCHAMBER_PLATFORM__;
-    if (typeof injected === 'string') {
-      return injected === 'win32';
-    }
-    return /Windows|Win32|Win64/i.test(navigator.userAgent || '');
   }, []);
 
   const macosMajorVersion = React.useMemo(() => {
@@ -1859,21 +1847,6 @@ export const Header: React.FC<HeaderProps> = ({
   const desktopSidebarActionsInline = !isRightSidebarOpen || !desktopRightSidebarActionsHost;
   const showMiniChatHeaderAction = hasElectronDesktopIPC && (isNewSessionDraftOpen || Boolean(currentSessionId));
 
-  const windowsTitleBarOverlayPaddingStyle = React.useMemo<React.CSSProperties | undefined>(() => {
-    if (!isDesktopApp || !isWinPlatform) {
-      return undefined;
-    }
-    // Windows titleBarOverlay: 3 buttons (min/max/close) at ~46px each ≈ 138px.
-    return { paddingRight: 138 };
-  }, [isDesktopApp, isWinPlatform]);
-
-  const mergedDesktopHeaderStyle = React.useMemo<React.CSSProperties | undefined>(() => {
-    if (windowsTitleBarOverlayPaddingStyle && webWindowControlsOverlayStyle) {
-      return { ...webWindowControlsOverlayStyle, ...windowsTitleBarOverlayPaddingStyle };
-    }
-    return windowsTitleBarOverlayPaddingStyle ?? webWindowControlsOverlayStyle;
-  }, [windowsTitleBarOverlayPaddingStyle, webWindowControlsOverlayStyle]);
-
   const renderDesktop = () => (
     <div
       onMouseDown={handleDragStart}
@@ -1882,7 +1855,7 @@ export const Header: React.FC<HeaderProps> = ({
         desktopPaddingClass,
         macosHeaderSizeClass
       )}
-      style={mergedDesktopHeaderStyle}
+      style={webWindowControlsOverlayStyle}
       role="tablist"
       aria-label={t('header.navigation.mainAria')}
     >
@@ -1997,10 +1970,6 @@ export const Header: React.FC<HeaderProps> = ({
           {!desktopSidebarActionsInline && desktopRightSidebarActionsHost
             ? createPortal(desktopSidebarActions, desktopRightSidebarActionsHost)
             : null}
-          {/* Custom window controls for Windows (frame:false removes native title bar) */}
-          {isWindowsDesktop() && canUseElectronDesktopIPC() ? (
-            <WindowsWindowControls />
-          ) : null}
         </div>
       </div>
     </div>

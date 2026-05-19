@@ -131,19 +131,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ isOpen, children, cl
     await startDesktopWindowDrag();
   }, [isDesktopApp]);
 
-  const isWinDesktop = React.useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const injected = (window as unknown as { __OPENCHAMBER_PLATFORM__?: string }).__OPENCHAMBER_PLATFORM__;
-    if (typeof injected === 'string') return injected === 'win32';
-    return /Windows|Win32|Win64/i.test(navigator?.userAgent || '');
-  }, []);
-
   const webWindowControlsOverlayStyle = React.useMemo<React.CSSProperties | undefined>(() => {
     if (isDesktopApp || isVSCode) {
-      // On Windows Electron, reserve space for titleBarOverlay (min/max/close)
-      if (isWinDesktop) {
-        return { paddingRight: 138 };
-      }
       return undefined;
     }
 
@@ -152,7 +141,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ isOpen, children, cl
       paddingRight: 'calc(0.75rem + var(--oc-wco-right-inset, 0px))',
       ...(isTabletStandalonePwa ? { paddingTop: 'var(--oc-safe-area-top, 0px)' } : null),
     };
-  }, [isDesktopApp, isTabletStandalonePwa, isVSCode, isWinDesktop]);
+  }, [isDesktopApp, isTabletStandalonePwa, isVSCode]);
 
   return (
     <aside
