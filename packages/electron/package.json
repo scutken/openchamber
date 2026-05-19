@@ -93,6 +93,23 @@
       "provider": "github",
       "owner": "openchamber",
       "repo": "openchamber"
+    },
+    "win": {
+      "icon": "resources/icons/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "splashImage": "resources/icons/icon.ico"
     }
   }
 }
