@@ -3,6 +3,9 @@ name: Build Windows
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -21,6 +24,13 @@ jobs:
         id: bun-version
         shell: bash
         run: echo "version=$(bun --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -e "console.log(require('./packages/electron/package.json').version)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Cache bun global
         uses: actions/cache@v4
@@ -66,11 +76,36 @@ jobs:
           ls -lh packages/electron/dist/*.exe 2>/dev/null || echo "No .exe found"
           ls -lh packages/electron/dist/*.blockmap 2>/dev/null || true
 
-      - name: Upload Windows artifacts
+      - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build
+          name: OpenChamber-${{ steps.version.outputs.version }}-setup
           path: |
-            packages/electron/dist/*.exe
-            packages/electron/dist/*.blockmap
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe.blockmap
           retention-days: 7
+
+      - name: Upload portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenChamber-${{ steps.version.outputs.version }}-portable
+          path: |
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64-portable.exe
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64-portable.exe.blockmap
+          retention-days: 7
+
+      - name: Create/Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          name: OpenChamber v${{ steps.version.outputs.version }} (Windows)
+          files: |
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe.blockmap
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64-portable.exe
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64-portable.exe.blockmap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
