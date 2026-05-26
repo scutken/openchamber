@@ -50,12 +50,22 @@ export const useWindowControlsOverlayLayout = () => {
     const overlay = navigatorWithOverlay.windowControlsOverlay;
 
     const updateGeometry = () => {
-      if (!overlay || !mediaQuery?.matches || !overlay.visible) {
+      // In PWA mode, the overlay is active when mediaQuery matches AND overlay.visible.
+      // In Electron with titleBarOverlay set, overlay.visible is sufficient — the
+      // CSS media query (display-mode: window-controls-overlay) is a PWA concept
+      // and won't match in Electron.
+      const overlayActive = overlay?.visible === true;
+      const pwaActive = mediaQuery?.matches === true;
+
+      if (!overlayActive && !pwaActive) {
         applyOverlayInsets(root, 0, 0, 0);
         return;
       }
 
-      const rect = overlay.getTitlebarAreaRect();
+      // Prefer the overlay API rect (works in Electron), fall back to 0
+      const rect = overlayActive
+        ? overlay.getTitlebarAreaRect()
+        : { x: 0, width: 0, height: 0 };
       const leftInset = Math.max(0, Number(rect.x) || 0);
       const width = Math.max(0, Number(rect.width) || 0);
       const titlebarHeight = Math.max(0, Number(rect.height) || 0);
