@@ -723,6 +723,23 @@ export const Header: React.FC<HeaderProps> = ({
   const hasElectronDesktopIPC = React.useMemo(() => canUseElectronDesktopIPC(), []);
   const isTabletStandalonePwa = useTabletStandalonePwaRuntime();
   const [isDesktopWindowFullscreen, setIsDesktopWindowFullscreen] = React.useState(false);
+  const [isMaximized, setIsMaximized] = React.useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleMaximizeChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ maximized?: boolean }>).detail;
+      if (typeof detail?.maximized === 'boolean') {
+        setIsMaximized(detail.maximized);
+      }
+    };
+
+    window.addEventListener('window-maximize', handleMaximizeChange);
+    return () => {
+      window.removeEventListener('window-maximize', handleMaximizeChange);
+    };
+  }, []);
 
   const isMacPlatform = React.useMemo(() => {
     if (typeof navigator === 'undefined') {
@@ -1293,7 +1310,9 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const handleMaximizeWindow = React.useCallback(() => {
-    void invokeDesktop('desktop_maximize_window', {}).catch(() => {});
+    void invokeDesktop('desktop_maximize_window', {}).then(() => {
+      setIsMaximized((prev) => !prev);
+    }).catch(() => {});
   }, []);
 
   const handleCloseWindow = React.useCallback(() => {
@@ -1993,20 +2012,20 @@ export const Header: React.FC<HeaderProps> = ({
                 title={t('header.actions.minimize')}
                 ariaLabel={t('header.actions.minimizeAria')}
                 onClick={handleMinimizeWindow}
-                Icon={'subtract-line'}
+                Icon={'subtract'}
               />
               <HeaderIconActionButton
-                title={t('header.actions.maximize')}
-                ariaLabel={t('header.actions.maximizeAria')}
+                title={isMaximized ? t('header.actions.restore') : t('header.actions.maximize')}
+                ariaLabel={isMaximized ? t('header.actions.restoreAria') : t('header.actions.maximizeAria')}
                 onClick={handleMaximizeWindow}
-                Icon={'checkbox-blank-line'}
+                Icon={isMaximized ? 'window-restore' : 'stop'}
               />
               <HeaderIconActionButton
                 title={t('header.actions.close')}
                 ariaLabel={t('header.actions.closeAria')}
                 onClick={handleCloseWindow}
-                Icon={'close-line'}
-                className="hover:bg-status-error/15 hover:text-status-error"
+                Icon={'close'}
+                className={cn(DESKTOP_HEADER_ICON_BUTTON_CLASS, "hover:bg-status-error/15 hover:text-status-error")}
               />
             </>
           )}

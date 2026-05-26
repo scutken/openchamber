@@ -1233,6 +1233,23 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
     state.focusedWindowIds.delete(browserWindow.id);
   });
 
+  browserWindow.on('maximize', () => {
+    if (!browserWindow.isDestroyed()) {
+      browserWindow.webContents.send('openchamber:emit', {
+        event: 'window-maximize',
+        detail: { maximized: true },
+      });
+    }
+  });
+  browserWindow.on('unmaximize', () => {
+    if (!browserWindow.isDestroyed()) {
+      browserWindow.webContents.send('openchamber:emit', {
+        event: 'window-maximize',
+        detail: { maximized: false },
+      });
+    }
+  });
+
   // Traffic lights disappear during dock-restore animation when using
   // titleBarStyle:'hidden' + custom trafficLightPosition. macOS caches a
   // snapshot of the window at miniaturize time and plays it during the
@@ -2150,7 +2167,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
 
     case 'desktop_get_installed_apps': {
       if (process.platform !== 'darwin') {
-        throw new Error('desktop_get_installed_apps is only supported on macOS');
+        return { apps: [], hasCache: true, isCacheStale: false };
       }
       const cachePath = buildInstalledAppsCachePath();
       const now = Math.floor(Date.now() / 1000);

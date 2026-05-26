@@ -2055,6 +2055,8 @@ export const dict: Record<I18nKey, string> = {
   'header.actions.minimizeAria': '最小化窗口',
   'header.actions.maximize': '最大化',
   'header.actions.maximizeAria': '最大化/还原窗口',
+  'header.actions.restore': '恢复',
+  'header.actions.restoreAria': '还原窗口',
   'header.actions.close': '关闭',
   'header.actions.closeAria': '关闭窗口',
   'errorBoundary.title': '发生错误',

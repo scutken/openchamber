@@ -2089,6 +2089,8 @@ export const dict = {
   'header.actions.minimizeAria': 'Minimize window',
   'header.actions.maximize': 'Maximize',
   'header.actions.maximizeAria': 'Maximize / Restore window',
+  'header.actions.restore': 'Restore',
+  'header.actions.restoreAria': 'Restore window',
   'header.actions.close': 'Close',
   'header.actions.closeAria': 'Close window',
   'errorBoundary.title': 'Something went wrong',

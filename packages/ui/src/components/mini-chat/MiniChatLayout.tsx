@@ -291,45 +291,6 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
         </button>
       </SessionSwitcherDropdown>
       <div className="min-w-0 flex-1" />
-      {/* Window controls (Windows/Linux) — custom buttons */}
-      {isDesktopApp && !hasMacTrafficLights && (
-        <>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => invokeDesktop('desktop_minimize_window', {}).catch(() => {})}
-            aria-label={t('header.actions.minimizeAria')}
-            title={t('header.actions.minimize')}
-            style={noDragRegionStyle}
-          >
-            <Icon name="subtract-line" className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => invokeDesktop('desktop_maximize_window', {}).catch(() => {})}
-            aria-label={t('header.actions.maximizeAria')}
-            title={t('header.actions.maximize')}
-            style={noDragRegionStyle}
-          >
-            <Icon name="checkbox-blank-line" className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => invokeDesktop('desktop_close_window', {}).catch(() => {})}
-            aria-label={t('header.actions.closeAria')}
-            title={t('header.actions.close')}
-            style={noDragRegionStyle}
-            className="hover:bg-status-error/15 hover:text-status-error"
-          >
-            <Icon name="close-line" className="h-4 w-4" />
-          </Button>
-        </>
-      )}
       {(stableContextUsage && stableContextUsage.totalTokens > 0) ? (
         <ContextUsageDisplay
           totalTokens={stableContextUsage.totalTokens}
