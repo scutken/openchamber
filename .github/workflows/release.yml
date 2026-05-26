@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - '*-win'
   workflow_dispatch:
     inputs:
       version:
