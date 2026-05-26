@@ -256,11 +256,14 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
   return (
     <header
       className={cn(
-        'flex items-center gap-3 border-b border-[var(--interactive-border)] bg-sidebar pr-3',
+        'flex items-center gap-3 border-b border-[var(--interactive-border)] bg-sidebar',
         hasMacTrafficLights ? 'pl-[5.5rem]' : 'pl-3',
         macosHeaderSizeClass || 'min-h-14',
       )}
-      style={dragRegionStyle}
+      style={{
+        ...dragRegionStyle,
+        paddingRight: 'calc(0.75rem + var(--oc-wco-right-inset, 0px))',
+      }}
     >
       <SessionSwitcherDropdown>
         <button

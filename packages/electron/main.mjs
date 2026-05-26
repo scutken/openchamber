@@ -1166,8 +1166,8 @@ const nextWindowLabel = () => {
 const getTitleBarOverlayConfig = () => {
   const isDark = nativeTheme.shouldUseDarkColors;
   return isDark
-    ? { color: '#0c0a09', symbolColor: '#fafaf9', height: 40 }
-    : { color: '#f5f5f4', symbolColor: '#1c1917', height: 40 };
+    ? { color: '#0c0a09', symbolColor: '#fafaf9', height: 48 }
+    : { color: '#f5f5f4', symbolColor: '#1c1917', height: 48 };
 };
 
 const syncAllWindowsTitleBarOverlay = () => {
