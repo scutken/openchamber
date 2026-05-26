@@ -1163,6 +1163,22 @@ const nextWindowLabel = () => {
   return value === 1 ? 'main' : `main-${value}`;
 };
 
+const getTitleBarOverlayConfig = () => {
+  const isDark = nativeTheme.shouldUseDarkColors;
+  return isDark
+    ? { color: '#0c0a09', symbolColor: '#fafaf9' }
+    : { color: '#f5f5f4', symbolColor: '#1c1917' };
+};
+
+const syncAllWindowsTitleBarOverlay = () => {
+  if (process.platform === 'darwin') return;
+  const config = getTitleBarOverlayConfig();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue;
+    try { win.setTitleBarOverlay(config); } catch {}
+  }
+};
+
 const readThemeSource = () => {
   const settings = readSettingsRoot();
   // themeMode is the user's intent; themeVariant is only the resolved
@@ -1190,11 +1206,12 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
     minHeight: MIN_WINDOW_HEIGHT,
     show: false,
     backgroundColor: '#151313',
-    // Tauri used an overlay title bar with explicit traffic-light placement.
-    // Electron's hiddenInset adds its own extra inset, which leaves the controls
-    // visibly lower than the app header. Use a plain hidden title bar instead.
-    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    // macOS uses hidden title bar with native traffic-light buttons.
+    // Windows/Linux use hidden title bar with Electron's titleBarOverlay
+    // (same approach as VS Code) so the window frame follows the app theme.
+    titleBarStyle: 'hidden',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
+    titleBarOverlay: process.platform !== 'darwin' ? getTitleBarOverlayConfig() : undefined,
     webPreferences: {
       additionalArguments: [
         `--openchamber-local-origin=${desktopLocalOrigin}`,
@@ -1460,8 +1477,9 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     minHeight: MINI_CHAT_MIN_WINDOW_HEIGHT,
     show: false,
     backgroundColor: '#151313',
-    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    titleBarStyle: 'hidden',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
+    titleBarOverlay: process.platform !== 'darwin' ? getTitleBarOverlayConfig() : undefined,
     webPreferences: {
       additionalArguments: [
         `--openchamber-local-origin=${desktopLocalOrigin}`,
@@ -2729,10 +2747,15 @@ app.whenReady().then(async () => {
     loginItemSettings,
   });
   nativeTheme.themeSource = readThemeSource();
+  nativeTheme.on('updated', () => {
+    syncAllWindowsTitleBarOverlay();
+  });
   setupAutoUpdater();
 
   if (process.platform === 'darwin') {
     Menu.setApplicationMenu(buildMacMenu());
+  } else {
+    Menu.setApplicationMenu(null);
   }
 
   if (process.platform === 'darwin' && app.isPackaged) {
