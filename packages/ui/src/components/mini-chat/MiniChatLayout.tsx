@@ -256,14 +256,11 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
   return (
     <header
       className={cn(
-        'flex items-center gap-3 border-b border-[var(--interactive-border)] bg-sidebar',
+        'flex items-center gap-3 border-b border-[var(--interactive-border)] bg-sidebar pr-3',
         hasMacTrafficLights ? 'pl-[5.5rem]' : 'pl-3',
         macosHeaderSizeClass || 'min-h-14',
       )}
-      style={{
-        ...dragRegionStyle,
-        paddingRight: 'calc(0.75rem + var(--oc-wco-right-inset, 0px))',
-      }}
+      style={dragRegionStyle}
     >
       <SessionSwitcherDropdown>
         <button
@@ -294,7 +291,46 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
         </button>
       </SessionSwitcherDropdown>
       <div className="min-w-0 flex-1" />
-      {stableContextUsage && stableContextUsage.totalTokens > 0 ? (
+      {/* Window controls (Windows/Linux) — custom buttons */}
+      {isDesktopApp && !hasMacTrafficLights && (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => invokeDesktop('desktop_minimize_window', {}).catch(() => {})}
+            aria-label={t('header.actions.minimizeAria')}
+            title={t('header.actions.minimize')}
+            style={noDragRegionStyle}
+          >
+            <Icon name="subtract-line" className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => invokeDesktop('desktop_maximize_window', {}).catch(() => {})}
+            aria-label={t('header.actions.maximizeAria')}
+            title={t('header.actions.maximize')}
+            style={noDragRegionStyle}
+          >
+            <Icon name="checkbox-blank-line" className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => invokeDesktop('desktop_close_window', {}).catch(() => {})}
+            aria-label={t('header.actions.closeAria')}
+            title={t('header.actions.close')}
+            style={noDragRegionStyle}
+            className="hover:bg-status-error/15 hover:text-status-error"
+          >
+            <Icon name="close-line" className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+      {(stableContextUsage && stableContextUsage.totalTokens > 0) ? (
         <ContextUsageDisplay
           totalTokens={stableContextUsage.totalTokens}
           percentage={displayContextPercentage}

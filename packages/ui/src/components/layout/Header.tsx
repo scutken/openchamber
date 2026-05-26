@@ -1288,6 +1288,18 @@ export const Header: React.FC<HeaderProps> = ({
     });
   }, [activeProject?.path, currentSessionId, handleOpenDraftMiniChat, isNewSessionDraftOpen, openDirectory]);
 
+  const handleMinimizeWindow = React.useCallback(() => {
+    void invokeDesktop('desktop_minimize_window', {}).catch(() => {});
+  }, []);
+
+  const handleMaximizeWindow = React.useCallback(() => {
+    void invokeDesktop('desktop_maximize_window', {}).catch(() => {});
+  }, []);
+
+  const handleCloseWindow = React.useCallback(() => {
+    void invokeDesktop('desktop_close_window', {}).catch(() => {});
+  }, []);
+
   const handleOpenContextPanel = React.useCallback(() => {
     const directory = normalize(openDirectory || '');
     if (!directory) {
@@ -1454,7 +1466,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, [isDesktopApp, isMacPlatform, macosMajorVersion]);
 
   const webWindowControlsOverlayStyle = React.useMemo<React.CSSProperties | undefined>(() => {
-    if (isVSCode) {
+    if (isDesktopApp || isVSCode) {
       return undefined;
     }
 
@@ -1466,7 +1478,7 @@ export const Header: React.FC<HeaderProps> = ({
       minHeight: 'max(3rem, var(--oc-wco-titlebar-height, 0px))',
       height: 'max(3rem, var(--oc-wco-titlebar-height, 0px))',
     };
-  }, [isTabletStandalonePwa, isVSCode]);
+  }, [isDesktopApp, isTabletStandalonePwa, isVSCode]);
 
   const updateHeaderHeight = React.useCallback(() => {
     if (typeof document === 'undefined') {
@@ -1974,6 +1986,30 @@ export const Header: React.FC<HeaderProps> = ({
             Icon={'picture-in-picture-2'}
           />
           {desktopSidebarActions}
+          {/* Window controls (Windows/Linux) — custom buttons */}
+          {isDesktopApp && !isMacPlatform && !isVSCode && (
+            <>
+              <HeaderIconActionButton
+                title={t('header.actions.minimize')}
+                ariaLabel={t('header.actions.minimizeAria')}
+                onClick={handleMinimizeWindow}
+                Icon={'subtract-line'}
+              />
+              <HeaderIconActionButton
+                title={t('header.actions.maximize')}
+                ariaLabel={t('header.actions.maximizeAria')}
+                onClick={handleMaximizeWindow}
+                Icon={'checkbox-blank-line'}
+              />
+              <HeaderIconActionButton
+                title={t('header.actions.close')}
+                ariaLabel={t('header.actions.closeAria')}
+                onClick={handleCloseWindow}
+                Icon={'close-line'}
+                className="hover:bg-status-error/15 hover:text-status-error"
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

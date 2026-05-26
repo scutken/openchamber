@@ -1163,22 +1163,6 @@ const nextWindowLabel = () => {
   return value === 1 ? 'main' : `main-${value}`;
 };
 
-const getTitleBarOverlayConfig = () => {
-  const isDark = nativeTheme.shouldUseDarkColors;
-  return isDark
-    ? { color: '#0c0a09', symbolColor: '#fafaf9', height: 48 }
-    : { color: '#f5f5f4', symbolColor: '#1c1917', height: 48 };
-};
-
-const syncAllWindowsTitleBarOverlay = () => {
-  if (process.platform === 'darwin') return;
-  const config = getTitleBarOverlayConfig();
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue;
-    try { win.setTitleBarOverlay(config); } catch {}
-  }
-};
-
 const readThemeSource = () => {
   const settings = readSettingsRoot();
   // themeMode is the user's intent; themeVariant is only the resolved
@@ -1207,11 +1191,10 @@ const createBrowserWindow = ({ label, restoreGeometry, url }) => {
     show: false,
     backgroundColor: '#151313',
     // macOS uses hidden title bar with native traffic-light buttons.
-    // Windows/Linux use hidden title bar with Electron's titleBarOverlay
-    // (same approach as VS Code) so the window frame follows the app theme.
+    // Windows/Linux use hidden title bar (no overlay) — window controls
+    // are rendered as custom HTML buttons in the header.
     titleBarStyle: 'hidden',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
-    titleBarOverlay: process.platform !== 'darwin' ? getTitleBarOverlayConfig() : undefined,
     webPreferences: {
       additionalArguments: [
         `--openchamber-local-origin=${desktopLocalOrigin}`,
@@ -1479,7 +1462,6 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     backgroundColor: '#151313',
     titleBarStyle: 'hidden',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
-    titleBarOverlay: process.platform !== 'darwin' ? getTitleBarOverlayConfig() : undefined,
     webPreferences: {
       additionalArguments: [
         `--openchamber-local-origin=${desktopLocalOrigin}`,
@@ -2413,6 +2395,20 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     case 'desktop_set_window_pinned':
       return setMiniChatPinned(browserWindow, args.pinned === true);
 
+    case 'desktop_minimize_window':
+      if (browserWindow && !browserWindow.isDestroyed()) browserWindow.minimize();
+      return null;
+
+    case 'desktop_maximize_window':
+      if (browserWindow && !browserWindow.isDestroyed()) {
+        browserWindow.isMaximized() ? browserWindow.unmaximize() : browserWindow.maximize();
+      }
+      return null;
+
+    case 'desktop_close_window':
+      if (browserWindow && !browserWindow.isDestroyed()) browserWindow.close();
+      return null;
+
     case 'desktop_get_window_pinned':
       return { pinned: Boolean(browserWindow?.__ocPinned) };
 
@@ -2630,6 +2626,9 @@ const COMMANDS_SAFE_FOR_REMOTE = new Set([
   'desktop_set_window_theme',
   'desktop_is_window_fullscreen',
   'desktop_start_window_drag',
+  'desktop_minimize_window',
+  'desktop_maximize_window',
+  'desktop_close_window',
   'desktop_get_app_version',
   'desktop_get_lan_address',
   'desktop_capture_page_rect',
@@ -2747,9 +2746,6 @@ app.whenReady().then(async () => {
     loginItemSettings,
   });
   nativeTheme.themeSource = readThemeSource();
-  nativeTheme.on('updated', () => {
-    syncAllWindowsTitleBarOverlay();
-  });
   setupAutoUpdater();
 
   if (process.platform === 'darwin') {
