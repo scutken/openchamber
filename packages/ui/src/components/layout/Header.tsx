@@ -1454,7 +1454,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, [isDesktopApp, isMacPlatform, macosMajorVersion]);
 
   const webWindowControlsOverlayStyle = React.useMemo<React.CSSProperties | undefined>(() => {
-    if (isDesktopApp || isVSCode) {
+    if (isVSCode) {
       return undefined;
     }
 
@@ -1466,7 +1466,7 @@ export const Header: React.FC<HeaderProps> = ({
       minHeight: 'max(3rem, var(--oc-wco-titlebar-height, 0px))',
       height: 'max(3rem, var(--oc-wco-titlebar-height, 0px))',
     };
-  }, [isDesktopApp, isTabletStandalonePwa, isVSCode]);
+  }, [isTabletStandalonePwa, isVSCode]);
 
   const updateHeaderHeight = React.useCallback(() => {
     if (typeof document === 'undefined') {
