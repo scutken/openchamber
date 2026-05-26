@@ -34,7 +34,14 @@ jobs:
         run: |
           VERSION=$(node -e "console.log(require('./packages/electron/package.json').version)")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          # When triggered by tag push, use the tag name. When triggered by
+          # workflow_dispatch (branch ref), derive a timestamp-based tag.
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v${VERSION}-win-ci-$(date +'%Y%m%d-%H%M%S')"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Cache bun global
         uses: actions/cache@v4
