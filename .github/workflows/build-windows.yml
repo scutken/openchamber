@@ -1,0 +1,109 @@
+name: Build Windows
+
+on:
+  push:
+    tags:
+      - '*-win'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get bun version
+        id: bun-version
+        shell: bash
+        run: echo "version=$(bun --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -e "console.log(require('./packages/electron/package.json').version)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # When triggered by tag push, use the tag name. When triggered by
+          # workflow_dispatch (branch ref), derive a timestamp-based tag.
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v${VERSION}-win-ci-$(date +'%Y%m%d-%H%M%S')"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Cache bun global
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ steps.bun-version.outputs.version }}-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            bun-${{ steps.bun-version.outputs.version }}-${{ runner.os }}-
+
+      - name: Cache electron binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('packages/electron/package.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $pkg.scripts.postinstall = "Write-Host 'postinstall skipped'"
+          $pkg | ConvertTo-Json -Depth 100 | Set-Content package.json -Encoding UTF8
+          bun install --frozen-lockfile
+          git checkout package.json
+        env:
+          BUN_INSTALL_SKIP_POSTINSTALL: "1"
+
+      - name: Build Electron app (NSIS installer)
+        working-directory: packages/electron
+        run: |
+          bun run build:web-assets
+          bun run bundle:main
+          bun run rebuild:native
+          .\node_modules\.bin\electron-builder --win nsis --publish=never
+
+      - name: List artifacts
+        shell: bash
+        run: |
+          echo "=== Built artifacts ==="
+          ls -lh packages/electron/dist/*.exe 2>/dev/null || echo "No .exe found"
+          ls -lh packages/electron/dist/*.blockmap 2>/dev/null || true
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenChamber-${{ steps.version.outputs.version }}-setup
+          path: |
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe.blockmap
+          retention-days: 7
+
+      - name: Create/Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          name: OpenChamber v${{ steps.version.outputs.version }} (Windows)
+          files: |
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe.blockmap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
