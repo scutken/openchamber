@@ -34,6 +34,7 @@ jobs:
         run: |
           VERSION=$(node -e "console.log(require('./packages/electron/package.json').version)")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Cache bun global
         uses: actions/cache@v4
@@ -54,23 +55,21 @@ jobs:
       - name: Install dependencies
         shell: pwsh
         run: |
-          # Workaround for Windows bun install EPERM on postinstall (patch-package)
           $pkg = Get-Content package.json | ConvertFrom-Json
           $pkg.scripts.postinstall = "Write-Host 'postinstall skipped'"
           $pkg | ConvertTo-Json -Depth 100 | Set-Content package.json -Encoding UTF8
           bun install --frozen-lockfile
-          # Restore original package.json
           git checkout package.json
         env:
           BUN_INSTALL_SKIP_POSTINSTALL: "1"
 
-      - name: Build Electron app (Windows)
+      - name: Build Electron app (NSIS installer)
         working-directory: packages/electron
         run: |
           bun run build:web-assets
           bun run bundle:main
           bun run rebuild:native
-          .\node_modules\.bin\electron-builder --win nsis portable --publish=never
+          .\node_modules\.bin\electron-builder --win nsis --publish=never
 
       - name: List artifacts
         shell: bash
@@ -88,19 +87,10 @@ jobs:
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe.blockmap
           retention-days: 7
 
-      - name: Upload portable
-        uses: actions/upload-artifact@v4
-        with:
-          name: OpenChamber-${{ steps.version.outputs.version }}-portable
-          path: |
-            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64-portable.exe
-            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64-portable.exe.blockmap
-          retention-days: 7
-
       - name: Create/Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.tag }}
           draft: false
           prerelease: false
           make_latest: true
@@ -108,7 +98,5 @@ jobs:
           files: |
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe.blockmap
-            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64-portable.exe
-            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64-portable.exe.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
