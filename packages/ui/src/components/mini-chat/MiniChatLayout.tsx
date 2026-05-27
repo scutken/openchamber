@@ -291,7 +291,7 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
         </button>
       </SessionSwitcherDropdown>
       <div className="min-w-0 flex-1" />
-      {(stableContextUsage && stableContextUsage.totalTokens > 0) ? (
+      {stableContextUsage && stableContextUsage.totalTokens > 0 ? (
         <ContextUsageDisplay
           totalTokens={stableContextUsage.totalTokens}
           percentage={displayContextPercentage}

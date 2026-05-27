@@ -109,7 +109,9 @@
       "icon": "resources/icons/icon.ico",
       "target": [
         "nsis"
-      ]
+      ],
+      "verifyUpdateCodeSignature": false,
+      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
