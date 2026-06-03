@@ -90,8 +90,8 @@ jobs:
         with:
           name: OpenChamber-${{ steps.version.outputs.version }}-setup
           path: |
-            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe
-            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe.blockmap
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe.blockmap
           retention-days: 7
 
       - name: Create/Update GitHub Release
@@ -103,7 +103,7 @@ jobs:
           make_latest: true
           name: OpenChamber v${{ steps.version.outputs.version }} (Windows)
           files: |
-            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe
-            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-x64.exe.blockmap
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe
+            packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
