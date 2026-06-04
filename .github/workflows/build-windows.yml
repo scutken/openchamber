@@ -122,6 +122,7 @@ jobs:
           path: |
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe.blockmap
+            packages/electron/dist/latest.yml
           retention-days: 7
 
       - name: Create/Update GitHub Release
@@ -136,5 +137,6 @@ jobs:
           files: |
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe.blockmap
+            packages/electron/dist/latest.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

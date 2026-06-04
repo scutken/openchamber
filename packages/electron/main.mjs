@@ -2262,7 +2262,7 @@ const compareSemver = (left, right) => {
 };
 
 const parseGithubRepo = () => {
-  return { owner: 'openchamber', repo: 'openchamber' };
+  return { owner: 'scutken', repo: 'openchamber' };
 };
 
 const setupAutoUpdater = () => {
@@ -2271,7 +2271,7 @@ const setupAutoUpdater = () => {
   }
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.allowPrerelease = false;
+  autoUpdater.allowPrerelease = true;
   autoUpdater.fullChangelog = true;
   autoUpdater.disableWebInstaller = false;
   autoUpdater.logger = log;

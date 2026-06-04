@@ -100,11 +100,11 @@
         }
       ]
     },
-    "publish": {
-      "provider": "github",
-      "owner": "openchamber",
-      "repo": "openchamber"
-    },
+  "publish": {
+    "provider": "github",
+    "owner": "scutken",
+    "repo": "openchamber"
+  },
     "win": {
       "icon": "resources/icons/icon.ico",
       "target": [
