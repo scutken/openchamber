@@ -85,6 +85,36 @@ jobs:
           ls -lh packages/electron/dist/*.exe 2>/dev/null || echo "No .exe found"
           ls -lh packages/electron/dist/*.blockmap 2>/dev/null || true
 
+      - name: Fetch upstream release notes
+        id: upstream
+        shell: bash
+        run: |
+          UPSTREAM_VER="${{ steps.version.outputs.version }}"
+          UPSTREAM_TAG="v${UPSTREAM_VER}"
+          echo "Fetching release notes from upstream tag: $UPSTREAM_TAG"
+          BODY=$(curl -sL "https://api.github.com/repos/openchamber/openchamber/releases/tags/${UPSTREAM_TAG}" | python3 -c "
+          import json, sys
+          try:
+              d = json.load(sys.stdin)
+              print(d.get('body', ''))
+          except:
+              print('')
+          " 2>/dev/null)
+          if [ -n "$BODY" ]; then
+            {
+              echo 'body<<UPSTREAM_EOF'
+              echo '## 📋 Upstream Release Notes ([openchamber/openchamber](https://github.com/openchamber/openchamber/releases/tag/'"$UPSTREAM_TAG"'))'
+              echo ''
+              echo "$BODY"
+              echo ''
+              echo '---'
+              echo '*Windows build by [scutken/openchamber](https://github.com/scutken/openchamber)*'
+              echo 'UPSTREAM_EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "No upstream release notes found for $UPSTREAM_TAG"
+          fi
+
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +132,7 @@ jobs:
           prerelease: false
           make_latest: true
           name: OpenChamber v${{ steps.version.outputs.version }} (Windows)
+          body: ${{ steps.upstream.outputs.body }}
           files: |
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe
             packages/electron/dist/OpenChamber-${{ steps.version.outputs.version }}-win-x64.exe.blockmap
