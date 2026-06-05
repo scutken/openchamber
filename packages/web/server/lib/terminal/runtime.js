@@ -71,8 +71,8 @@ export function createTerminalRuntime({
         process.env.OPENCHAMBER_TERMINAL_SHELL,
         process.env.SHELL,
         process.env.ComSpec,
-        path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
         'pwsh.exe',
+        path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
         'powershell.exe',
         'cmd.exe',
       ].filter(Boolean);
