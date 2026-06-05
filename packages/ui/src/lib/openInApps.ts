@@ -28,6 +28,7 @@ export const OPEN_IN_APPS: OpenInApp[] = [
   { id: 'kiro', label: 'Kiro', appName: 'Kiro' },
   { id: 'antigravity', label: 'Antigravity', appName: 'Antigravity' },
   { id: 'trae', label: 'Trae', appName: 'Trae' },
+  { id: 'qoder', label: 'Qoder', appName: 'Qoder' },
 ];
 
 export const DEFAULT_OPEN_IN_APP_ID = 'finder';

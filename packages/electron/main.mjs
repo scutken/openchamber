@@ -2502,6 +2502,7 @@ const CLI_BY_APP_ID = {
   vscodium: 'codium',
   windsurf: 'windsurf',
   zed: 'zed',
+  qoder: 'qoder',
 };
 
 const WINDOWS_CLI_BY_APP_ID = {
@@ -2510,6 +2511,7 @@ const WINDOWS_CLI_BY_APP_ID = {
   vscodium: 'codium.cmd',
   windsurf: 'windsurf.cmd',
   zed: 'zed.cmd',
+  qoder: 'qoder.cmd',
 };
 
 const WINDOWS_APP_EXECUTABLES = {
@@ -2519,6 +2521,7 @@ const WINDOWS_APP_EXECUTABLES = {
   vscodium: ['codium.exe', 'codium.cmd'],
   windsurf: ['windsurf.exe', 'windsurf.cmd'],
   zed: ['zed.exe', 'zed.cmd'],
+  qoder: ['qoder.exe', 'qoder.cmd'],
   'visual-studio': ['devenv.exe'],
   'sublime-text': ['subl.exe', 'sublime_text.exe'],
 };
@@ -2535,6 +2538,7 @@ const WINDOWS_APP_ID_BY_NAME = new Map([
   ['zed', 'zed'],
   ['visual studio', 'visual-studio'],
   ['sublime text', 'sublime-text'],
+  ['qoder', 'qoder'],
 ]);
 
 const getWindowsAppIdForName = (appName) => WINDOWS_APP_ID_BY_NAME.get(String(appName || '').trim().toLowerCase()) || '';
